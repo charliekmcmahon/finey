@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "finey": {
+      "command": "npx",
+      "args": ["-y", "tsx", "mcp/server.ts"],
+      "cwd": "/Users/charliemcmahon/Developer/finey"
+    }
+  }
+}
