@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     })
     .run();
 
-  seedAccounts(connectionId, remoteAccounts);
+  await seedAccounts(tokens.access_token, connectionId, remoteAccounts);
 
   return NextResponse.redirect(new URL(`/connections/${connectionId}`, url.origin), 303);
 }

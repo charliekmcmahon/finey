@@ -5,7 +5,8 @@ import { decryptSecret, encryptSecret } from "../db/crypto";
 import { refreshAccessToken } from "../openfeed/token";
 import { listAccounts } from "../openfeed/accounts";
 import { listTransactions } from "../openfeed/transactions";
-import type { OpenfeedAccount, OpenfeedTransaction } from "../openfeed/types";
+import { getAccountBalance } from "../openfeed/balances";
+import type { OpenfeedAccount, OpenfeedBalance, OpenfeedTransaction } from "../openfeed/types";
 
 function toCents(amount: string | number | undefined | null): number | null {
   if (amount === undefined || amount === null) return null;
@@ -19,9 +20,16 @@ function toDate(value: string | undefined | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function upsertAccount(connectionId: string, account: OpenfeedAccount, now: Date) {
-  const balanceCurrent = toCents(account.balance?.current);
-  const balanceAvailable = toCents(account.balance?.available);
+/** Balance isn't on the accounts-list response at all — it's a separate per-account
+ * endpoint (GET /v1/banking/accounts/{id}/balance), fetched by the caller and passed in. */
+function upsertAccount(
+  connectionId: string,
+  account: OpenfeedAccount,
+  balance: OpenfeedBalance | null,
+  now: Date,
+) {
+  const balanceCurrent = balance ? toCents(balance.currentBalance) : null;
+  const balanceAvailable = balance ? toCents(balance.availableBalance) : null;
   const shared = {
     displayName: account.displayName ?? null,
     accountType: account.accountType ?? null,
@@ -29,16 +37,25 @@ function upsertAccount(connectionId: string, account: OpenfeedAccount, now: Date
     productName: account.productName ?? null,
     maskedNumber: account.maskedNumber ?? null,
     status: account.status ?? null,
-    currency: account.currency ?? null,
+    currency: balance?.currency ?? account.currency ?? null,
     balanceCurrent,
     balanceAvailable,
-    balanceUpdatedAt: balanceCurrent !== null ? now : null,
-    rawJson: JSON.stringify(account),
+    balanceUpdatedAt: balance ? now : null,
+    rawJson: JSON.stringify({ ...account, balance }),
   };
   db.insert(accounts)
     .values({ id: account.accountId, connectionId, createdAt: now, updatedAt: now, ...shared })
     .onConflictDoUpdate({ target: accounts.id, set: { ...shared, updatedAt: now } })
     .run();
+}
+
+async function fetchBalance(accessToken: string, accountId: string): Promise<OpenfeedBalance | null> {
+  try {
+    return await getAccountBalance(accessToken, accountId);
+  } catch (err) {
+    console.error(`balance fetch failed for account ${accountId}:`, err);
+    return null;
+  }
 }
 
 /** Returns true if this transaction was newly inserted (false if it already existed). */
@@ -68,9 +85,16 @@ function upsertTransaction(accountId: string, txn: OpenfeedTransaction, now: Dat
 /** Seeds accounts (and only accounts — no transactions) right after a fresh consent, so the
  * new connection has something to show immediately; the caller already has a live access
  * token from the token exchange, so no refresh/decrypt round-trip is needed here. */
-export function seedAccounts(connectionId: string, remoteAccounts: OpenfeedAccount[]) {
+export async function seedAccounts(
+  accessToken: string,
+  connectionId: string,
+  remoteAccounts: OpenfeedAccount[],
+) {
   const now = new Date();
-  for (const account of remoteAccounts) upsertAccount(connectionId, account, now);
+  for (const account of remoteAccounts) {
+    const balance = await fetchBalance(accessToken, account.accountId);
+    upsertAccount(connectionId, account, balance, now);
+  }
 }
 
 export interface SyncResult {
@@ -114,7 +138,8 @@ export async function syncConnection(
     const now = new Date();
     let transactionsAdded = 0;
     for (const account of remoteAccounts) {
-      upsertAccount(connectionId, account, now);
+      const balance = await fetchBalance(tokens.access_token, account.accountId);
+      upsertAccount(connectionId, account, balance, now);
       const remoteTxns = await listTransactions(tokens.access_token, account.accountId);
       for (const txn of remoteTxns) {
         if (upsertTransaction(account.accountId, txn, now)) transactionsAdded += 1;

@@ -36,10 +36,18 @@ export interface OpenfeedAccount {
   creationDate?: string;
   isOwned?: boolean;
   currency?: string;
-  balance?: {
-    current?: string | number;
-    available?: string | number;
-  };
+  [key: string]: unknown;
+}
+
+/** Shape confirmed against a real GET /v1/banking/accounts/{id}/balance response — balance
+ * is NOT included on the accounts list at all; it's a separate per-account call. */
+export interface OpenfeedBalance {
+  accountId: string;
+  currency?: string;
+  currentBalance?: string | number;
+  availableBalance?: string | number;
+  creditLimit?: string | number | null;
+  amortisedLimitAmount?: string | number | null;
   [key: string]: unknown;
 }
 
