@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { importPKCS8, importJWK, type JWK } from "jose";
 import { KID } from "./config";
+import { projectRoot } from "../root";
 
-const SECRETS_DIR = path.join(process.cwd(), "secrets");
+const SECRETS_DIR = path.join(projectRoot(), "secrets");
 
 interface DPoPJwk extends JWK {
   d: string;

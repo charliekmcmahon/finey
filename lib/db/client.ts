@@ -3,8 +3,9 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
+import { projectRoot } from "../root";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = path.join(projectRoot(), "data");
 mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, "finey.db");
 

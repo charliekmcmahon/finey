@@ -2,8 +2,11 @@
   "mcpServers": {
     "finey": {
       "command": "npx",
-      "args": ["-y", "tsx", "mcp/server.ts"],
-      "cwd": "/Users/charliemcmahon/Developer/finey"
+      "args": ["-y", "tsx", "/Users/charliemcmahon/Developer/finey/mcp/server.ts"],
+      "cwd": "/Users/charliemcmahon/Developer/finey",
+      "env": {
+        "FINEY_PROJECT_ROOT": "/Users/charliemcmahon/Developer/finey"
+      }
     }
   }
 }
